@@ -6,7 +6,9 @@ Class {
 		'trait1',
 		'class1',
 		'trait2',
-		'class2'
+		'class2',
+		'trait3',
+		'class3'
 	],
 	#category : #'TraitsFlattening-Tests'
 }
@@ -20,6 +22,26 @@ TraitsFlattenerTest >> assertTrait: aTrait wasFlattenInto: aClass testingSelecto
 	self assert: (aClass >> aSelector) isInstalled.
 	self assert: (aClass >> aSelector) protocol equals: 'testing'.
 	self assert: (aClass new perform: aSelector)
+]
+
+{ #category : #classes }
+TraitsFlattenerTest >> buildHierarchyOfThreeClassesUsingTraits [
+	class1 := self classUsingT1.
+	trait2 := self traitNamed: #TraitToFlatten2.
+	class2 := self classNamed: #SubclassUsingTrait2 using: trait2.
+	trait3 := self traitNamed: #TraitToFlatten3.
+	trait3 compile: 'origin ^ ''Trait3''' classified: 'accessing'.
+	class3 := self classNamed: #SubclassUsingTrait3 using: trait3.
+	class2 superclass: class1.
+	class3 superclass: class2
+]
+
+{ #category : #classes }
+TraitsFlattenerTest >> buildHierarchyOfTwoClassesUsingTraits [
+	class1 := self classUsingT1.
+	trait2 := self traitNamed: #TraitToFlatten2.
+	class2 := self classNamed: #SubclassUsingTrait2 using: trait2.
+	class2 superclass: class1
 ]
 
 { #category : #traits }
@@ -73,7 +95,7 @@ TraitsFlattenerTest >> classUsing: aTraitComposition [
 
 { #category : #classes }
 TraitsFlattenerTest >> classUsingT1 [
-	^ self classNamed: #ClassUsingTraitComposition using: trait1
+	^ self classNamed: #ClassUsingTrait1 using: trait1
 ]
 
 { #category : #classes }
@@ -112,10 +134,13 @@ TraitsFlattenerTest >> setUp [
 TraitsFlattenerTest >> tearDown [
 	{class1.
 	class2.
+	class3.
 	trait1.
-	trait2}
+	trait2.
+	trait3}
 		do:
-			[ :classOrTrait | classOrTrait ifNotNil: [ classOrTrait removeFromSystem ] ]
+			[ :classOrTrait | classOrTrait ifNotNil: [ classOrTrait removeFromSystem ] ].
+	super tearDown
 ]
 
 { #category : #tests }
@@ -137,6 +162,99 @@ TraitsFlattenerTest >> testClassSide [
 		assert: (class1 class >> #hasTraitClassMethod) protocol
 		equals: 'testing'.
 	self assert: (class1 perform: #hasTraitClassMethod)
+]
+
+{ #category : #tests }
+TraitsFlattenerTest >> testDoNotflattenMiddleClass [
+	| origin1 origin2 origin3 |
+	self buildHierarchyOfThreeClassesUsingTraits.
+	origin1 := class1 new origin.
+	origin2 := class2 new origin.
+	origin3 := class3 new origin.
+
+	flattener flattenClasses: {class1. class3}.
+
+	self assert: class1 new origin equals: origin1.
+	self assert: class2 new origin equals: origin2.
+	self assert: class3 new origin equals: origin3.
+	self assert: class1 class class equals: Metaclass.
+	self assert: class2 class class equals: TraitedMetaclass.
+	self assert: class2 class class equals: TraitedMetaclass
+]
+
+{ #category : #tests }
+TraitsFlattenerTest >> testFlattenOnlySubclass [
+	| origin1 origin2 |
+	self buildHierarchyOfTwoClassesUsingTraits.
+	origin1 := class1 new origin.
+	origin2 := class2 new origin.
+
+	flattener flattenClass: class2.
+
+	self assert: class1 new origin equals: origin1.
+	self assert: class2 new origin equals: origin2.
+	self assert: class1 hasTraitComposition.
+	self assert: (trait1 users includes: class1).
+	self deny: class2 hasTraitComposition.
+	self deny: (trait2 users includes: class2).
+	{class1.
+	class2}
+		do: [ :class | self assert: class class class equals: TraitedMetaclass ]
+]
+
+{ #category : #tests }
+TraitsFlattenerTest >> testFlattenOnlySuperclass [
+	| origin1 origin2 |
+	self buildHierarchyOfTwoClassesUsingTraits.
+	origin1 := class1 new origin.
+	origin2 := class2 new origin.
+
+	flattener flattenClass: class1.
+
+	self assert: class1 new origin equals: origin1.
+	self assert: class2 new origin equals: origin2.
+	self deny: class1 hasTraitComposition.
+	self deny: (trait1 users includes: class1).
+	self assert: class2 hasTraitComposition.
+	self assert: (trait2 users includes: class2).
+	self assert: class1 class class equals: Metaclass.
+	self assert: class2 class class equals: TraitedMetaclass
+]
+
+{ #category : #tests }
+TraitsFlattenerTest >> testHierarchy [
+	| origin1 origin2 |
+	self buildHierarchyOfTwoClassesUsingTraits.
+	origin1 := class1 new origin.
+	origin2 := class2 new origin.
+	flattener
+		flattenClasses:
+			{class1.
+			class2}.
+	self assert: class1 new origin equals: origin1.
+	self assert: class2 new origin equals: origin2.
+	{class1.
+	class2}
+		do: [ :class | self assert: class class class equals: Metaclass ]
+]
+
+{ #category : #tests }
+TraitsFlattenerTest >> testHierarchyFlatteningOrder [
+	| origin1 origin2 |
+	self buildHierarchyOfTwoClassesUsingTraits.
+	origin1 := class1 new origin.
+	origin2 := class2 new origin.
+
+	"Class before superclass"
+	flattener
+		flattenClasses:
+			{class2.
+			class1}.
+	self assert: class1 new origin equals: origin1.
+	self assert: class2 new origin equals: origin2.
+	{class1.
+	class2}
+		do: [ :class | self assert: class class class equals: Metaclass ]
 ]
 
 { #category : #tests }
@@ -324,6 +442,7 @@ TraitsFlattenerTest >> traitNamed: aTraitName using: aTraitComposition slots: sl
 		slots: slots , {self defaultSecondSlotName}
 		package: self packageName.
 	trait compile: 'hasMethodFromTrait2 ^ true' classified: 'testing'.
+	trait compile: 'origin ^ ''Trait2''' classified: 'accessing'.
 	^ trait
 ]
 

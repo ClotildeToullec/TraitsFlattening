@@ -30,7 +30,16 @@ TraitsFlattener >> flattenClass: aClass [
 
 { #category : #public }
 TraitsFlattener >> flattenClasses: someClasses [
-	someClasses do: [ :class | self flattenClass: class ]
+	| superclasses subclasses |
+	superclasses := OrderedCollection new.
+	subclasses := OrderedCollection new.
+	someClasses copy
+		do: [ :class | 
+			((someClasses includesAny: class allSuperclasses)
+				ifTrue: [ subclasses ]
+				ifFalse: [ superclasses ]) add: class ].
+	self privateFlattenClasses: superclasses.
+	subclasses ifNotEmpty: [ self flattenClasses: subclasses ]
 ]
 
 { #category : #public }
@@ -48,6 +57,11 @@ TraitsFlattener >> flattenPackageNamed: aRPackageName [
 TraitsFlattener >> methodsFrom: traitComposition [
 	^ traitComposition selectors removeDuplicates
 		collect: [ :sel | traitComposition compiledMethodAt: sel ]
+]
+
+{ #category : #public }
+TraitsFlattener >> privateFlattenClasses: someClasses [
+	someClasses do: [ :class | self flattenClass: class ]
 ]
 
 { #category : #private }
