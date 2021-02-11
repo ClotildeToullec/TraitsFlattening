@@ -14,120 +14,179 @@ Class {
 }
 
 { #category : #tests }
-TraitsFlattenerTest >> assertTrait: aTrait wasFlattenInto: aClass testingSelector: aSelector [
+TraitsFlattenerTest >> assertClass: aClass stillUsesTrait: aTrait [
+
+	self assert: (aClass traits includes: aTrait).
+	self assert: (aTrait users includes: aClass).
+	self assert: aClass class class equals: TraitedMetaclass
+]
+
+{ #category : #tests }
+TraitsFlattenerTest >> assertTrait: aTrait wasFlattenInto: aClass [
+
+	| selector |
 	self deny: aClass hasTraitComposition.
-	self deny: (aTrait users includes: aClass).
-	aTrait slotNames
-		do: [ :slotName | self assert: (aClass hasSlotNamed: slotName) ].
-	self assert: (aClass >> aSelector) isInstalled.
-	self assert: (aClass >> aSelector) protocol equals: 'testing'.
-	self assert: (aClass new perform: aSelector)
+	self deny: (aTrait allUsers includes: aClass).
+
+	aTrait slotNames do: [ :slotName | 
+		self assert: (aClass hasSlotNamed: slotName) ].
+
+	selector := self testingSelectorFromTrait: aTrait.
+	self assert: (aClass >> selector) isInstalled.
+	self
+		assert: (aClass >> selector) protocol
+		equals: (aTrait >> selector) protocol.
+	self assert: (aClass new perform: selector).
+
+	self assert: aClass class class equals: aClass superclass class class
 ]
 
 { #category : #classes }
-TraitsFlattenerTest >> buildHierarchyOfThreeClassesUsingTraits [
-	class1 := self classUsingT1.
-	trait2 := self traitNamed: #TraitToFlatten2.
-	class2 := self classNamed: #SubclassUsingTrait2 using: trait2.
-	trait3 := self traitNamed: #TraitToFlatten3.
-	trait3 compile: 'origin ^ ''Trait3''' classified: 'accessing'.
-	class3 := self classNamed: #SubclassUsingTrait3 using: trait3.
-	class2 superclass: class1.
-	class3 superclass: class2
+TraitsFlattenerTest >> buildClass1 [
+
+	class1 := Object
+		          subclass: #Class1UsingTrait1
+		          uses: trait1
+		          instanceVariableNames: self class1SlotName
+		          classVariableNames: ''
+		          package: self packageName.
+	class1 class instanceVariableNames: self class1ClassSlotName.
+	class1
+		compile: self class1LocalSelector asString , ' ^true'
+		classified: 'local'.
+	class1 class
+		compile: self class1LocalClassSelector asString , ' ^true'
+		classified: 'class-local'
 ]
 
 { #category : #classes }
-TraitsFlattenerTest >> buildHierarchyOfTwoClassesUsingTraits [
-	class1 := self classUsingT1.
-	trait2 := self traitNamed: #TraitToFlatten2.
-	class2 := self classNamed: #SubclassUsingTrait2 using: trait2.
-	class2 superclass: class1
+TraitsFlattenerTest >> buildClassesHierarchy [
+
+	class2 := self secondClassUsing: trait2 superclass: class1.
+	class3 := self thirdClassUsing: trait3 superclass: class2
 ]
 
 { #category : #traits }
 TraitsFlattenerTest >> buildTrait1 [
+
 	trait1 := Trait
-		named: #TraitToFlatten1
-		uses: {}
-		slots: {#slotFromTrait1}
-		package: self packageName.
+		          named: #TraitToFlatten1
+		          uses: {  }
+		          slots: { self trait1SlotName }
+		          package: self packageName.
+
+	"Instance side methods"
 	trait1 compile: 'hasMethodFromTrait1 ^ true' classified: 'testing'.
-	trait1
-		compile: 'slotFromTrait1 ^ slotFromTrait1'
-		classified: 'accessing'.
-	trait1
-		compile: 'slotFromTrait1: anObject slotFromTrait1 := anObject'
-		classified: 'accessing'.
 	trait1 compile: 'origin ^ ''Trait1''' classified: 'accessing'.
-	trait1 addClassSlot: #classSlotFromT1.
+
+	"Accessors"
+	trait1
+		compile: self trait1SlotName asString , ' ^ slotFromTrait1'
+		classified: 'accessing'.
+	trait1
+		compile: self trait1SlotName asMutator asString
+			, ' anObject slotFromTrait1 := anObject'
+		classified: 'accessing'.
+
+	"Class side"
+	trait1 addClassSlot: self trait1ClassSlotName.
 	trait1 classSide
-		compile:
-			'hasTraitClassMethod
+		compile: self trait1ClassSideSelector , '
 	^ true'
 		classified: 'testing'
 ]
 
-{ #category : #classes }
-TraitsFlattenerTest >> classNamed: aClassName using: aTraitComposition [
-	^ self
-		classNamed: aClassName
-		using: aTraitComposition
-		slotNames: ''
-		classSlotNames: ''
-]
+{ #category : #traits }
+TraitsFlattenerTest >> buildTrait2 [
 
-{ #category : #classes }
-TraitsFlattenerTest >> classNamed: aClassName using: aTraitComposition slotNames: slotNames classSlotNames: classSlotNames [
-	^ Object
-		subclass: aClassName
-		uses: aTraitComposition
-		instanceVariableNames: slotNames
-		classVariableNames: classSlotNames
-		package: self packageName
-]
-
-{ #category : #classes }
-TraitsFlattenerTest >> classUsing: aTraitComposition [
-	^ self
-		classNamed: #ClassUsingTraitComposition
-		using: aTraitComposition
-]
-
-{ #category : #classes }
-TraitsFlattenerTest >> classUsingT1 [
-	^ self classNamed: #ClassUsingTrait1 using: trait1
-]
-
-{ #category : #classes }
-TraitsFlattenerTest >> classUsingT1WithLocalSlotsAndMethods [
-	| newClass |
-	newClass := self
-		classNamed: #ClassWithSlotsAndMethods
-		using: trait1
-		slotNames: 'slotFromC1'
-		classSlotNames: 'classSlotFromT1'.
-	newClass compile: 'hasLocalMethodFromC1 ^true' classified: 'local'.
-	newClass class
-		compile: 'hasClassLocalMethodFromC1 ^true'
-		classified: 'class-local'.
-	^ newClass
+	trait2 := self secondTraitUsing: {  }
 ]
 
 { #category : #traits }
-TraitsFlattenerTest >> defaultSecondSlotName [
-	^ #slotFromTrait2
+TraitsFlattenerTest >> buildTrait3 [
+
+	trait3 := self thirdTraitUsing: {  }
 ]
 
-{ #category : #running }
+{ #category : #literals }
+TraitsFlattenerTest >> class1ClassSlotName [
+
+	^ 'classSlotFromClass1'
+]
+
+{ #category : #literals }
+TraitsFlattenerTest >> class1LocalClassSelector [
+
+	^ #hasLocalClassMethod
+]
+
+{ #category : #literals }
+TraitsFlattenerTest >> class1LocalSelector [
+
+	^ #hasLocalMethod
+]
+
+{ #category : #literals }
+TraitsFlattenerTest >> class1SlotName [
+
+	^ 'slotFromClass1'
+]
+
+{ #category : #classes }
+TraitsFlattenerTest >> classes [
+
+	^ { 
+		  class1.
+		  class2.
+		  class3 } reject: #isNil
+]
+
+{ #category : #literals }
 TraitsFlattenerTest >> packageName [
-	^ 'TraitsFlattening-Tests'
+
+	^ 'TraitsFlattening-TestExamples'
+]
+
+{ #category : #classes }
+TraitsFlattenerTest >> secondClassUsing: aTraitComposition [
+
+	^ self secondClassUsing: aTraitComposition superclass: Object
+]
+
+{ #category : #classes }
+TraitsFlattenerTest >> secondClassUsing: aTraitComposition superclass: aSuperclass [
+
+	^ aSuperclass
+		  subclass: #Class2InFlatteningTests
+		  uses: aTraitComposition
+		  instanceVariableNames: 'slotFromClass2'
+		  classVariableNames: 'classSlotFromClass2'
+		  package: self packageName
+]
+
+{ #category : #traits }
+TraitsFlattenerTest >> secondTraitUsing: aTraitComposition [
+
+	| trait |
+	trait := Trait
+		         named: #TraitToFlatten2
+		         uses: aTraitComposition
+		         slots: { #slotFromTrait2 }
+		         package: self packageName.
+	trait compile: 'hasMethodFromTrait2 ^ true' classified: 'testing'.
+	trait compile: 'origin ^ ''Trait2''' classified: 'accessing'.
+	^ trait
 ]
 
 { #category : #running }
 TraitsFlattenerTest >> setUp [
+
 	super setUp.
 	flattener := TraitsFlattener new.
-	self buildTrait1
+	self buildTrait1.
+	self buildClass1.
+	self buildTrait2.
+	self buildTrait3
 ]
 
 { #category : #running }
@@ -145,47 +204,91 @@ TraitsFlattenerTest >> tearDown [
 
 { #category : #tests }
 TraitsFlattenerTest >> testClassMetaClass [
-	class1 := self classUsingT1.
+
 	flattener flattenClass: class1.
+
 	self assert: class1 class class equals: Metaclass
 ]
 
 { #category : #tests }
 TraitsFlattenerTest >> testClassSide [
-	class1 := self classUsingT1.
+
 	flattener flattenClass: class1.
+
 	self deny: class1 class hasTraitComposition.
 	self deny: (trait1 class users includes: class1 class).
-	self assert: (class1 class hasSlotNamed: #classSlotFromT1).
-	self assert: (class1 class >> #hasTraitClassMethod) isInstalled.
+
+	self assert: (class1 class hasSlotNamed: self trait1ClassSlotName).
+
+	self assert:
+		(class1 class >> self trait1ClassSideSelector) isInstalled.
 	self
-		assert: (class1 class >> #hasTraitClassMethod) protocol
-		equals: 'testing'.
-	self assert: (class1 perform: #hasTraitClassMethod)
+		assert: (class1 class >> self trait1ClassSideSelector) protocol
+		equals: (trait1 class >> self trait1ClassSideSelector) protocol.
+	self assert: (class1 perform: self trait1ClassSideSelector)
 ]
 
 { #category : #tests }
 TraitsFlattenerTest >> testDoNotflattenMiddleClass [
+
 	| origin1 origin2 origin3 |
-	self buildHierarchyOfThreeClassesUsingTraits.
+	self buildClassesHierarchy.
+
 	origin1 := class1 new origin.
 	origin2 := class2 new origin.
 	origin3 := class3 new origin.
 
-	flattener flattenClasses: {class1. class3}.
+	flattener flattenClasses: { 
+			class1.
+			class3 }.
 
 	self assert: class1 new origin equals: origin1.
 	self assert: class2 new origin equals: origin2.
 	self assert: class3 new origin equals: origin3.
-	self assert: class1 class class equals: Metaclass.
-	self assert: class2 class class equals: TraitedMetaclass.
-	self assert: class2 class class equals: TraitedMetaclass
+
+	self assertTrait: trait1 wasFlattenInto: class1.
+	self assertClass: class2 stillUsesTrait: trait2.
+	self assertTrait: trait3 wasFlattenInto: class3
+]
+
+{ #category : #tests }
+TraitsFlattenerTest >> testFlattenAllHierarchy [
+
+	| origin1 origin2 origin3 |
+	self buildClassesHierarchy.
+
+	origin1 := class1 new origin.
+	origin2 := class2 new origin.
+	origin3 := class3 new origin.
+
+	flattener flattenClasses: self classes.
+
+	self assert: class1 new origin equals: origin1.
+	self assert: class2 new origin equals: origin2.
+	self assert: class3 new origin equals: origin3.
+
+	self classes
+		with: self traits
+		do: [ :class :trait | self assertTrait: trait wasFlattenInto: class ]
+]
+
+{ #category : #tests }
+TraitsFlattenerTest >> testFlattenAllTraitsInComposition [
+
+	class1 setTraitComposition: trait1 + trait2.
+	
+	flattener flattenClass: class1.
+	
+	self assertTrait: trait1 wasFlattenInto: class1.
+	self assertTrait: trait2 wasFlattenInto: class1
 ]
 
 { #category : #tests }
 TraitsFlattenerTest >> testFlattenOnlySubclass [
+
 	| origin1 origin2 |
-	self buildHierarchyOfTwoClassesUsingTraits.
+	self buildClassesHierarchy.
+
 	origin1 := class1 new origin.
 	origin2 := class2 new origin.
 
@@ -193,19 +296,17 @@ TraitsFlattenerTest >> testFlattenOnlySubclass [
 
 	self assert: class1 new origin equals: origin1.
 	self assert: class2 new origin equals: origin2.
-	self assert: class1 hasTraitComposition.
-	self assert: (trait1 users includes: class1).
-	self deny: class2 hasTraitComposition.
-	self deny: (trait2 users includes: class2).
-	{class1.
-	class2}
-		do: [ :class | self assert: class class class equals: TraitedMetaclass ]
+
+	self assertClass: class1 stillUsesTrait: trait1.
+	self assertTrait: trait2 wasFlattenInto: class2
 ]
 
 { #category : #tests }
 TraitsFlattenerTest >> testFlattenOnlySuperclass [
+
 	| origin1 origin2 |
-	self buildHierarchyOfTwoClassesUsingTraits.
+	self buildClassesHierarchy.
+
 	origin1 := class1 new origin.
 	origin2 := class2 new origin.
 
@@ -213,257 +314,244 @@ TraitsFlattenerTest >> testFlattenOnlySuperclass [
 
 	self assert: class1 new origin equals: origin1.
 	self assert: class2 new origin equals: origin2.
-	self deny: class1 hasTraitComposition.
-	self deny: (trait1 users includes: class1).
-	self assert: class2 hasTraitComposition.
-	self assert: (trait2 users includes: class2).
-	self assert: class1 class class equals: Metaclass.
-	self assert: class2 class class equals: TraitedMetaclass
+
+	self assertTrait: trait1 wasFlattenInto: class1.
+	self assertClass: class2 stillUsesTrait: trait2
 ]
 
 { #category : #tests }
-TraitsFlattenerTest >> testHierarchy [
-	| origin1 origin2 |
-	self buildHierarchyOfTwoClassesUsingTraits.
-	origin1 := class1 new origin.
-	origin2 := class2 new origin.
-	flattener
-		flattenClasses:
-			{class1.
-			class2}.
-	self assert: class1 new origin equals: origin1.
-	self assert: class2 new origin equals: origin2.
-	{class1.
-	class2}
-		do: [ :class | self assert: class class class equals: Metaclass ]
+TraitsFlattenerTest >> testFlatteningRespectsTraitsPrecedence [
+
+	class1 setTraitComposition:
+		(trait1 + trait2 withPrecedenceOf: trait2).
+	flattener flattenClass: class1.
+
+	self assertTrait: trait1 wasFlattenInto: class1.
+	self assertTrait: trait2 wasFlattenInto: class1.
+
+	self assert: (class1 new perform: #origin) equals: 'Trait2'
 ]
 
 { #category : #tests }
 TraitsFlattenerTest >> testHierarchyFlatteningOrder [
-	| origin1 origin2 |
-	self buildHierarchyOfTwoClassesUsingTraits.
+
+	| origin1 origin2 origin3 |
+	self buildClassesHierarchy.
+
 	origin1 := class1 new origin.
 	origin2 := class2 new origin.
+	origin3 := class3 new origin.
 
-	"Class before superclass"
-	flattener
-		flattenClasses:
-			{class2.
-			class1}.
+	flattener flattenClasses: self classes shuffle.
+
 	self assert: class1 new origin equals: origin1.
 	self assert: class2 new origin equals: origin2.
-	{class1.
-	class2}
-		do: [ :class | self assert: class class class equals: Metaclass ]
+	self assert: class3 new origin equals: origin3.
+
+	self classes
+		with: self traits
+		do: [ :class :trait | self assertTrait: trait wasFlattenInto: class ]
 ]
 
 { #category : #tests }
 TraitsFlattenerTest >> testInstanceSideAccessors [
+
 	| instance |
-	class1 := self classUsingT1.
 	flattener flattenClass: class1.
-	self deny: class1 hasTraitComposition.
-	self assertEmpty: trait1 users.
+
 	instance := class1 new.
+
 	self
-		shouldnt: [ instance perform: #slotFromTrait1: with: true ]
+		shouldnt: [ 
+		instance perform: self trait1SlotName asMutator with: true ]
 		raise: MessageNotUnderstood.
 	self
-		shouldnt: [ instance perform: #slotFromTrait1 ]
+		shouldnt: [ instance perform: self trait1SlotName ]
 		raise: MessageNotUnderstood.
-	self assert: (instance perform: #slotFromTrait1)
+	self assert: (instance perform: self trait1SlotName)
 ]
 
 { #category : #tests }
 TraitsFlattenerTest >> testInstanceSideMethod [
-	class1 := self classUsingT1.
+
+	| selector |
+	selector := self testingSelectorFromTrait: trait1.
+
 	flattener flattenClass: class1.
-	self assert: (class1 >> #hasMethodFromTrait1) isInstalled.
+
+	self assert: (class1 >> selector) isInstalled.
 	self
-		assert: (class1 >> #hasMethodFromTrait1) protocol
-		equals: 'testing'.
-	self assert: (class1 new perform: #hasMethodFromTrait1)
+		assert: (class1 >> selector) protocol
+		equals: (trait1 >> selector) protocol.
+	self assert: (class1 new perform: selector)
 ]
 
 { #category : #tests }
 TraitsFlattenerTest >> testInstanceSideSlot [
-	class1 := self classUsingT1.
+
 	flattener flattenClass: class1.
-	self assert: (class1 hasSlotNamed: #slotFromTrait1)
+
+	self assert: (class1 hasSlotNamed: self trait1SlotName)
 ]
 
 { #category : #tests }
 TraitsFlattenerTest >> testKeepLocalSlotsAndMethods [
-	class1 := self classUsingT1WithLocalSlotsAndMethods.
+
 	flattener flattenClass: class1.
 
 	"Instace side"
-	self assert: (class1 hasSlotNamed: 'slotFromC1').
-	self assert: (class1 >> #hasLocalMethodFromC1) isInstalled.
+	self assert: (class1 hasSlotNamed: self class1SlotName).
+	self assert: (class1 >> self class1LocalSelector) isInstalled.
 	self
-		assert: (class1 >> #hasLocalMethodFromC1) protocol
+		assert: (class1 >> self class1LocalSelector) protocol
 		equals: 'local'.
-	self assert: (class1 new perform: #hasLocalMethodFromC1).
+	self assert: (class1 new perform: self class1LocalSelector).
 
 	"Class side"
-	self assert: (class1 class hasSlotNamed: 'classSlotFromT1').
-	self assert: (class1 class >> #hasClassLocalMethodFromC1) isInstalled.
+	self assert: (class1 class hasSlotNamed: self class1ClassSlotName).
+	self assert:
+		(class1 class >> self class1LocalClassSelector) isInstalled.
 	self
-		assert: (class1 class >> #hasClassLocalMethodFromC1) protocol
+		assert: (class1 class >> self class1LocalClassSelector) protocol
 		equals: 'class-local'.
-	self assert: (class1 perform: #hasClassLocalMethodFromC1)
-]
-
-{ #category : #tests }
-TraitsFlattenerTest >> testLocalPrecedence [
-	class1 := self classUsingT1.
-	class1 compile: 'origin ^ ''Class1''' classified: 'accessing'.
-	flattener flattenClass: class1.
-	self
-		assertTrait: trait1
-		wasFlattenInto: class1
-		testingSelector: #hasMethodFromTrait1.
-	self assert: (class1 >> #origin) isInstalled.
-	self assert: (class1 >> #origin) protocol equals: 'accessing'.
-	self assert: (class1 new perform: #origin) equals: 'Class1'
+	self assert: (class1 perform: self class1LocalClassSelector)
 ]
 
 { #category : #tests }
 TraitsFlattenerTest >> testOthersUsersUnchanged [
-	class1 := self classUsingT1.
-	class2 := self
-		classNamed: #OtherClassUsingTraitComposition
-		using: trait1.
+
+	class2 := self secondClassUsing: trait1.
+
 	flattener flattenClass: class1.
-	self deny: (trait1 users includes: class1).
-	self assert: (trait1 users includes: class2).
-	self deny: class1 hasTraitComposition.
-	self assert: class2 traits anyOne equals: trait1
+
+	self assertTrait: trait1 wasFlattenInto: class1.
+	self assertClass: class2 stillUsesTrait: trait1
 ]
 
 { #category : #tests }
-TraitsFlattenerTest >> testOverridenMethod [
-	| expectedOrigin |
-	class1 := self classNamed: #SuperClassForClass1 using: {}.
-	class1 compile: 'origin ^ ''Superclass'' ' classified: 'accessing'.
+TraitsFlattenerTest >> testPrecedenceOfLocalMethodOverTrait [
 
-	class2 := self classUsingT1.
-	class2 superclass: class1.
+	class1 compile: 'origin ^ ''Class1''' classified: 'accessing'.
 
-	expectedOrigin := class2 new origin.
+	flattener flattenClass: class1.
+
+	self assertTrait: trait1 wasFlattenInto: class1.
+
+	self assert: class1 new origin equals: 'Class1'
+]
+
+{ #category : #tests }
+TraitsFlattenerTest >> testPrecedenceOfTraitOverSuperclass [
+
+	class1 compile: 'origin ^ ''Class1'' ' classified: 'accessing'.
+
+	self buildClassesHierarchy.
 
 	flattener flattenClass: class2.
 
-	self assert: class2 new origin equals: expectedOrigin
+	self assert: class2 new origin equals: 'Trait2'
+]
+
+{ #category : #tests }
+TraitsFlattenerTest >> testPrecedenceOfTraitOverTheTraitItUses [
+
+	trait2 := self secondTraitUsing: trait1.
+
+	class2 := self secondClassUsing: trait2.
+
+	flattener flattenClass: class2.
+
+	self assert: class2 new origin equals: 'Trait2'
 ]
 
 { #category : #tests }
 TraitsFlattenerTest >> testRemoveFromUsers [
-	class1 := self classUsingT1.
+
 	flattener flattenClass: class1.
-	self deny: (trait1 users includes: class1)
+	
+	self deny: (trait1 allUsers includes: class1)
 ]
 
 { #category : #tests }
 TraitsFlattenerTest >> testRemoveTraitComposition [
-	class1 := self classUsingT1.
+
 	flattener flattenClass: class1.
+	
 	self deny: class1 hasTraitComposition
 ]
 
 { #category : #tests }
-TraitsFlattenerTest >> testTraitComposition [
-	trait2 := self traitNamed: #TraitToFlatten2.
-	class1 := self classUsing: trait1 + trait2.
-	flattener flattenClass: class1.
-	self
-		assertTrait: trait1
-		wasFlattenInto: class1
-		testingSelector: #hasMethodFromTrait1.
-	self
-		assertTrait: trait2
-		wasFlattenInto: class1
-		testingSelector: #hasMethodFromTrait2
-]
-
-{ #category : #tests }
-TraitsFlattenerTest >> testTraitPrecedence [
-	trait2 := self traitWithPrecedence.
-	class1 := self classUsing: (trait1 + trait2 withPrecedenceOf: trait2).
-	flattener flattenClass: class1.
-	self
-		assertTrait: trait1
-		wasFlattenInto: class1
-		testingSelector: #hasMethodFromTrait1.
-	self
-		assertTrait: trait2
-		wasFlattenInto: class1
-		testingSelector: #hasMethodFromTrait2.
-	self assert: (class1 >> #origin) isInstalled.
-	self assert: (class1 >> #origin) protocol equals: 'accessing'.
-	self
-		assert: (class1 new perform: #origin)
-		equals: 'TraitWithPrecedence'
-]
-
-{ #category : #tests }
 TraitsFlattenerTest >> testTraitUsingTrait [
-	trait2 := self traitNamed: #TUsingATrait using: trait1.
-	class1 := self classUsing: trait2.
-	flattener flattenClass: class1.
-	self assertCollection: trait1 users hasSameElements: {trait2}.
-	self assertCollection: trait2 traits hasSameElements: {trait1}.
-	self
-		assertTrait: trait1
-		wasFlattenInto: class1
-		testingSelector: #hasMethodFromTrait1.
-	self
-		assertTrait: trait2
-		wasFlattenInto: class1
-		testingSelector: #hasMethodFromTrait2
+
+	trait2 := self secondTraitUsing: trait1.
+
+	class2 := self secondClassUsing: trait2.
+
+	flattener flattenClass: class2.
+
+	self assertCollection: trait1 users hasSameElements: { 
+			trait2.
+			class1 }.
+	self assertCollection: trait2 traits hasSameElements: { trait1 }.
+
+	self assertTrait: trait1 wasFlattenInto: class2.
+	self assertTrait: trait2 wasFlattenInto: class2
 ]
 
 { #category : #traits }
-TraitsFlattenerTest >> traitNamed: aTraitName [
-	^ self traitNamed: aTraitName using: {} slots: {}
+TraitsFlattenerTest >> testingSelectorFromTrait: aTrait [
+
+	^ #hasMethodFromTrait , (self traits indexOf: aTrait) asString
+]
+
+{ #category : #classes }
+TraitsFlattenerTest >> thirdClassUsing: aTraitComposition superclass: aSuperclass [
+
+	^ aSuperclass
+		  subclass: #Class3InFlatteningTests
+		  uses: aTraitComposition
+		  instanceVariableNames: 'slotFromClass3'
+		  classVariableNames: 'classSlotFromClass3'
+		  package: self packageName
 ]
 
 { #category : #traits }
-TraitsFlattenerTest >> traitNamed: aTraitName using: aTraitComposition [
-	^ self traitNamed: aTraitName using: aTraitComposition slots: {}
-]
+TraitsFlattenerTest >> thirdTraitUsing: aTraitComposition [
 
-{ #category : #traits }
-TraitsFlattenerTest >> traitNamed: aTraitName using: aTraitComposition slots: slots [
 	| trait |
 	trait := Trait
-		named: aTraitName
-		uses: aTraitComposition
-		slots: slots , {self defaultSecondSlotName}
-		package: self packageName.
-	trait compile: 'hasMethodFromTrait2 ^ true' classified: 'testing'.
-	trait compile: 'origin ^ ''Trait2''' classified: 'accessing'.
+		         named: #TraitToFlatten3
+		         uses: aTraitComposition
+		         slots: { #slotFromTrait3 }
+		         package: self packageName.
+	trait compile: 'hasMethodFromTrait3 ^ true' classified: 'testing'.
+	trait compile: 'origin ^ ''Trait3''' classified: 'accessing'.
 	^ trait
 ]
 
-{ #category : #traits }
-TraitsFlattenerTest >> traitWithClassSideMethod [
-	| trait |
-	trait := self traitNamed: #TWithClassMethod.
-	trait classSide
-		compile:
-			'hasTraitClassMethod
-	^ true'
-		classified: 'testing'.
-	^ trait
+{ #category : #literals }
+TraitsFlattenerTest >> trait1ClassSideSelector [
+
+	^ #hasTraitClassMethod
+]
+
+{ #category : #literals }
+TraitsFlattenerTest >> trait1ClassSlotName [
+
+	^ #classSlotFromT1
+]
+
+{ #category : #literals }
+TraitsFlattenerTest >> trait1SlotName [
+
+	^ #slotFromTrait1
 ]
 
 { #category : #traits }
-TraitsFlattenerTest >> traitWithPrecedence [
-	| trait |
-	trait := self traitNamed: #TWithPrecedence.
-	trait
-		compile: 'origin ^ ''TraitWithPrecedence'''
-		classified: 'accessing'.
-	^ trait
+TraitsFlattenerTest >> traits [
+
+	^ { 
+		  trait1.
+		  trait2.
+		  trait3 }
 ]
