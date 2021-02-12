@@ -16,11 +16,12 @@ TraitsFlattener >> compileMethodsFrom: traitComposition into: aClass [
 
 { #category : #public }
 TraitsFlattener >> flattenClass: aClass [
+
 	| newClass traitComposition |
 	traitComposition := aClass traitComposition.
 	newClass := self
-		updateClass: aClass
-		fromTraitComposition: traitComposition.
+		            updateClass: aClass
+		            fromTraitComposition: traitComposition.
 	self compileMethodsFrom: traitComposition into: aClass.
 	self
 		compileMethodsFrom: traitComposition classComposition
@@ -30,14 +31,14 @@ TraitsFlattener >> flattenClass: aClass [
 
 { #category : #public }
 TraitsFlattener >> flattenClasses: someClasses [
+
 	| superclasses subclasses |
 	superclasses := OrderedCollection new.
 	subclasses := OrderedCollection new.
-	someClasses copy
-		do: [ :class | 
-			((someClasses includesAny: class allSuperclasses)
-				ifTrue: [ subclasses ]
-				ifFalse: [ superclasses ]) add: class ].
+	someClasses copy do: [ :class | 
+		((someClasses includesAny: class allSuperclasses)
+			 ifTrue: [ subclasses ]
+			 ifFalse: [ superclasses ]) add: class ].
 	self privateFlattenClasses: superclasses.
 	subclasses ifNotEmpty: [ self flattenClasses: subclasses ]
 ]
@@ -59,7 +60,7 @@ TraitsFlattener >> methodsFrom: traitComposition [
 		collect: [ :sel | traitComposition compiledMethodAt: sel ]
 ]
 
-{ #category : #public }
+{ #category : #private }
 TraitsFlattener >> privateFlattenClasses: someClasses [
 	someClasses do: [ :class | self flattenClass: class ]
 ]

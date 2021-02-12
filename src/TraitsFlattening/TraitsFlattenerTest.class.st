@@ -182,7 +182,7 @@ TraitsFlattenerTest >> secondTraitUsing: aTraitComposition [
 TraitsFlattenerTest >> setUp [
 
 	super setUp.
-	flattener := TraitsFlattener new.
+	flattener := HackedTraitsFlattener new.
 	self buildTrait1.
 	self buildClass1.
 	self buildTrait2.
