@@ -45,13 +45,14 @@ TraitsFlattener >> flattenClasses: someClasses [
 
 { #category : #public }
 TraitsFlattener >> flattenPackage: aRPackage [
-	self flattenClasses: aRPackage classes
+
+	self flattenClasses: aRPackage definedClasses
 ]
 
 { #category : #public }
 TraitsFlattener >> flattenPackageNamed: aRPackageName [
-	self
-		flattenClasses: (RPackage organizer packageNamed: aRPackageName) classes
+
+	self flattenPackage: (RPackage organizer packageNamed: aRPackageName)
 ]
 
 { #category : #private }

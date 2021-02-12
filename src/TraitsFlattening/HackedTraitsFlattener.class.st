@@ -82,13 +82,14 @@ HackedTraitsFlattener >> flattenClassesWhenFixed: someClasses [
 
 { #category : #public }
 HackedTraitsFlattener >> flattenPackage: aRPackage [
-	self flattenClasses: aRPackage classes
+
+	self flattenClasses: aRPackage definedClasses
 ]
 
 { #category : #public }
 HackedTraitsFlattener >> flattenPackageNamed: aRPackageName [
-	self
-		flattenClasses: (RPackage organizer packageNamed: aRPackageName) classes
+
+	self flattenPackage: (RPackage organizer packageNamed: aRPackageName)
 ]
 
 { #category : #private }
