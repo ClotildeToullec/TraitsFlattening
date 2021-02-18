@@ -2,10 +2,23 @@ Class {
 	#name : #HackedTraitsFlattener,
 	#superclass : #Object,
 	#instVars : [
-		'unchangedClassesAndTraits'
+		'unchangedClassesAndTraits',
+		'traitsAndUsersCache'
 	],
 	#category : #'TraitsFlattening-Flattener'
 }
+
+{ #category : #private }
+HackedTraitsFlattener >> buildTraitsAndUsersCacheFor: someClasses [
+
+	| traits |
+	traits := (someClasses flatCollect: #traits) asOrderedCollection.
+	traitsAndUsersCache := Dictionary
+		                       newFromKeys: traits
+		                       andValues: (traits collect: [ :trait | 
+				                        trait users select: [ :class | 
+					                        someClasses includes: class ] ])
+]
 
 { #category : #private }
 HackedTraitsFlattener >> compileMethodsFrom: traitComposition into: aClass [
@@ -23,7 +36,7 @@ HackedTraitsFlattener >> flattenClass: aClass [
 	self flattenClasses: { aClass }
 ]
 
-{ #category : #public }
+{ #category : #private }
 HackedTraitsFlattener >> flattenClassWhenFixed: aClass [
 
 	| newClass traitComposition |
@@ -41,8 +54,10 @@ HackedTraitsFlattener >> flattenClassWhenFixed: aClass [
 { #category : #public }
 HackedTraitsFlattener >> flattenClasses: someClasses [
 
+	self buildTraitsAndUsersCacheFor: someClasses.
 	self flattenClassesHack: someClasses.
-	self restoreChangedClassesIn: someClasses. 
+	self restoreChangedClassesIn: someClasses.
+	self updateFameSlotsIn: someClasses.
 	self restoreUnchangedClasses
 ]
 
@@ -66,20 +81,6 @@ HackedTraitsFlattener >> flattenClassesHack: someClasses [
 	superclasses ifNotEmpty: [ self flattenClassesHack: superclasses ]
 ]
 
-{ #category : #'when fixed' }
-HackedTraitsFlattener >> flattenClassesWhenFixed: someClasses [
-
-	| superclasses subclasses |
-	superclasses := OrderedCollection new.
-	subclasses := OrderedCollection new.
-	someClasses copy do: [ :class | 
-		((someClasses includesAny: class allSuperclasses)
-			 ifTrue: [ subclasses ]
-			 ifFalse: [ superclasses ]) add: class ].
-	self privateFlattenClasses: superclasses.
-	subclasses ifNotEmpty: [ self flattenClasses: subclasses ]
-]
-
 { #category : #public }
 HackedTraitsFlattener >> flattenPackage: aRPackage [
 
@@ -100,7 +101,8 @@ HackedTraitsFlattener >> methodsFrom: traitComposition [
 
 { #category : #private }
 HackedTraitsFlattener >> privateFlattenClasses: someClasses [
-	someClasses do: [ :class | self flattenClassWhenFixed: class ]
+
+	someClasses do: [ :class | self flattenClassWhenFixed: class ].
 ]
 
 { #category : #hack }
@@ -173,4 +175,15 @@ HackedTraitsFlattener >> updateClass: aClass fromTraitComposition: traitComposit
 				classTraitComposition: {};
 				slots: aClass localSlots , traitComposition slots;
 				classSlots: aClass class localSlots , traitComposition classComposition slots ]
+]
+
+{ #category : #public }
+HackedTraitsFlattener >> updateFameSlotsIn: someClasses [
+
+	(someClasses flatCollect: #slots)
+		select: [ :slot | 
+			slot isFameSlot and: [ 
+				slot hasInverse and: [ slot targetClass isTrait ] ] ]
+		thenDo: [ :slot | 
+			slot inClass: (traitsAndUsersCache at: slot targetClass) anyOne ]
 ]

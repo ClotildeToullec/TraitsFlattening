@@ -1,8 +1,23 @@
 Class {
 	#name : #TraitsFlattener,
 	#superclass : #Object,
+	#instVars : [
+		'traitsAndUsersCache'
+	],
 	#category : #'TraitsFlattening-Flattener'
 }
+
+{ #category : #private }
+TraitsFlattener >> buildTraitsAndUsersCacheFor: someClasses [
+
+	| traits |
+	traits := (someClasses flatCollect: #traits) asOrderedCollection.
+	traitsAndUsersCache := Dictionary
+		                       newFromKeys: traits
+		                       andValues: (traits collect: [ :trait | 
+				                        trait users select: [ :class | 
+					                        someClasses includes: class ] ])
+]
 
 { #category : #private }
 TraitsFlattener >> compileMethodsFrom: traitComposition into: aClass [
@@ -32,15 +47,9 @@ TraitsFlattener >> flattenClass: aClass [
 { #category : #public }
 TraitsFlattener >> flattenClasses: someClasses [
 
-	| superclasses subclasses |
-	superclasses := OrderedCollection new.
-	subclasses := OrderedCollection new.
-	someClasses copy do: [ :class | 
-		((someClasses includesAny: class allSuperclasses)
-			 ifTrue: [ subclasses ]
-			 ifFalse: [ superclasses ]) add: class ].
-	self privateFlattenClasses: superclasses.
-	subclasses ifNotEmpty: [ self flattenClasses: subclasses ]
+	self buildTraitsAndUsersCacheFor: someClasses.
+	self privateFlattenClasses: someClasses.
+	self updateFameSlotsIn: someClasses
 ]
 
 { #category : #public }
@@ -63,7 +72,16 @@ TraitsFlattener >> methodsFrom: traitComposition [
 
 { #category : #private }
 TraitsFlattener >> privateFlattenClasses: someClasses [
-	someClasses do: [ :class | self flattenClass: class ]
+
+	| superclasses subclasses |
+	superclasses := OrderedCollection new.
+	subclasses := OrderedCollection new.
+	someClasses copy do: [ :class | 
+		((someClasses includesAny: class allSuperclasses)
+			 ifTrue: [ subclasses ]
+			 ifFalse: [ superclasses ]) add: class ].
+	superclasses do: [ :class | self flattenClass: class ].
+	subclasses ifNotEmpty: [ self flattenClasses: subclasses ]
 ]
 
 { #category : #private }
@@ -78,4 +96,15 @@ TraitsFlattener >> updateClass: aClass fromTraitComposition: traitComposition [
 				classTraitComposition: {};
 				slots: aClass localSlots , traitComposition slots;
 				classSlots: aClass class localSlots , traitComposition classComposition slots ]
+]
+
+{ #category : #public }
+TraitsFlattener >> updateFameSlotsIn: someClasses [
+
+	(someClasses flatCollect: #slots)
+		select: [ :slot | 
+			slot isFameSlot and: [ 
+				slot hasInverse and: [ slot targetClass isTrait ] ] ]
+		thenDo: [ :slot | 
+			slot inClass: (traitsAndUsersCache at: slot targetClass) anyOne ]
 ]
