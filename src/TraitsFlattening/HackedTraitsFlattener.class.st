@@ -16,7 +16,7 @@ HackedTraitsFlattener >> buildTraitsAndUsersCacheFor: someClasses [
 	traitsAndUsersCache := Dictionary
 		                       newFromKeys: traits
 		                       andValues: (traits collect: [ :trait | 
-				                        trait users select: [ :class | 
+				                        trait allUsers select: [ :class | 
 					                        someClasses includes: class ] ])
 ]
 
