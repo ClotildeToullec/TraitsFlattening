@@ -182,7 +182,7 @@ HackedTraitsFlattener >> updateFameSlotsIn: someClasses [
 
 	(someClasses flatCollect: #slots)
 		select: [ :slot | 
-			slot isFameSlot and: [ 
+			slot isFMRelationSlot and: [ 
 				slot hasInverse and: [ slot targetClass isTrait ] ] ]
 		thenDo: [ :slot | 
 			slot inClass: (traitsAndUsersCache at: slot targetClass) anyOne ]
