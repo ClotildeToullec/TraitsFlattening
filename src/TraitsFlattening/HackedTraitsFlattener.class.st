@@ -12,11 +12,11 @@ Class {
 HackedTraitsFlattener >> buildTraitsAndUsersCacheFor: someClasses [
 
 	| traits |
-	traits := (someClasses flatCollect: #traits) asOrderedCollection.
+	traits := (someClasses flatCollect: #allTraits) asOrderedCollection.
 	traitsAndUsersCache := Dictionary
 		                       newFromKeys: traits
 		                       andValues: (traits collect: [ :trait | 
-				                        trait allUsers select: [ :class | 
+				                        trait allUsers flattened select: [ :class | 
 					                        someClasses includes: class ] ])
 ]
 
@@ -185,5 +185,8 @@ HackedTraitsFlattener >> updateFameSlotsIn: someClasses [
 			slot isFMRelationSlot and: [ 
 				slot hasInverse and: [ slot targetClass isTrait ] ] ]
 		thenDo: [ :slot | 
-			slot inClass: (traitsAndUsersCache at: slot targetClass) anyOne ]
+			slot inClass: (traitsAndUsersCache
+					 at: slot targetClass
+					 ifPresent: [ :users | users anyOne ]
+					 ifAbsent: [ slot targetClass ]) ]
 ]
