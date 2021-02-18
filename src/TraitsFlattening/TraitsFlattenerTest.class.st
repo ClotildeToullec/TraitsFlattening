@@ -108,6 +108,12 @@ TraitsFlattenerTest >> buildTrait3 [
 	trait3 := self thirdTraitUsing: {  }
 ]
 
+{ #category : #accessing }
+TraitsFlattenerTest >> class1 [
+
+	^ class1
+]
+
 { #category : #literals }
 TraitsFlattenerTest >> class1ClassSlotName [
 
@@ -193,14 +199,17 @@ TraitsFlattenerTest >> setUp [
 { #category : #running }
 TraitsFlattenerTest >> tearDown [
 
-	{ 
+	"	{ 
 		class1.
 		class2.
 		class3.
 		trait1.
 		trait2.
 		trait3 } do: [ :classOrTrait | 
-		classOrTrait ifNotNil: [ classOrTrait removeFromSystem ] ].
+		classOrTrait ifNotNil: [ classOrTrait removeFromSystem ] ]."
+
+	((RPackage organizer packageNamed: 'TraitsFlattening') 
+		 classTagNamed: 'TestExamples') classes do: #removeFromSystem.
 	EpMonitor current enable.
 	super tearDown
 ]
@@ -274,32 +283,44 @@ TraitsFlattenerTest >> testFMSlots [
 ]
 
 { #category : #tests }
-TraitsFlattenerTest >> testFMSlotswithSeveralUsers [
+TraitsFlattenerTest >> testFMSlotsWithSeveralUsers [
 
-	| slot1 slot2 slot3 |
+	| slot1 slot2 slot3 newClass |
+	self buildTrait2.
 	trait1 addSlot: (#fmSlot => FMOne type: trait2 opposite: #fmOpposite).
 	trait2 addSlot: (#fmOpposite => FMOne type: trait1 opposite: #fmSlot).
-	class2 := self secondClassUsing: trait2.
-	class3 := self thirdClassUsing: trait2.
 
-	flattener flattenClasses: self classes.
+	class2 := self secondClassUsing:
+		          (Trait
+			           named: #TraitToFlatten3
+			           uses: trait2
+			           package: self packageName).
+	class3 := self thirdClassUsing:
+		          (Trait
+			           named: #TraitToFlatten4
+			           uses: trait2
+			           package: self packageName).
 
+"	UIManager nonInteractiveDuring: [ 
+		[ "flattener flattenClasses: self classes "]
+			on: ProvideAnswerNotification
+			do: [ :e | e resume: #NewSuperclassToFlatten ] ]".
 	slot1 := class1 slotNamed: #fmSlot.
 	slot2 := class2 slotNamed: #fmOpposite.
 	slot3 := class3 slotNamed: #fmOpposite.
 
+	newClass := class2 commonSuperclassWith: class3.
+	self deny: newClass identicalTo: Object.
+	self assertTrait: trait2 wasFlattenInto: newClass.
+
 	self assert: slot1 hasInverse.
 	self assert: slot1 definingClass equals: class1.
-	self assert: slot1 targetClass equals: { 
-			class2.
-			class3 }. 
-	"This is wrong. A FMRelationSlot does not know several inverse types. This test should not pass, as this issue is not resolved"
-
+	self assert: slot1 targetClass equals: newClass.
 	self assert: slot2 hasInverse.
-	self assert: slot2 definingClass equals: class2.
+	self assert: slot2 definingClass equals: newClass.
 	self assert: slot2 targetClass equals: class1.
 	self assert: slot3 hasInverse.
-	self assert: slot3 definingClass equals: class2.
+	self assert: slot3 definingClass equals: newClass.
 	self assert: slot3 targetClass equals: class1
 ]
 
@@ -590,6 +611,12 @@ TraitsFlattenerTest >> thirdTraitUsing: aTraitComposition [
 	^ trait
 ]
 
+{ #category : #accessing }
+TraitsFlattenerTest >> trait1 [
+
+	^ trait1
+]
+
 { #category : #literals }
 TraitsFlattenerTest >> trait1ClassSideSelector [
 
@@ -606,6 +633,12 @@ TraitsFlattenerTest >> trait1ClassSlotName [
 TraitsFlattenerTest >> trait1SlotName [
 
 	^ #slotFromTrait1
+]
+
+{ #category : #accessing }
+TraitsFlattenerTest >> trait2 [
+
+	^ trait2
 ]
 
 { #category : #traits }
