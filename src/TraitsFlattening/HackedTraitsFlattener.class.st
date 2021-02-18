@@ -141,6 +141,18 @@ HackedTraitsFlattener >> flattenClassesHack: someClasses [
 ]
 
 { #category : #public }
+HackedTraitsFlattener >> flattenPackage: aRPackage [
+
+	self flattenClasses: aRPackage definedClasses
+]
+
+{ #category : #public }
+HackedTraitsFlattener >> flattenPackageNamed: aRPackageName [
+
+	self flattenPackage: (RPackage organizer packageNamed: aRPackageName)
+]
+
+{ #category : #public }
 HackedTraitsFlattener >> methodsFrom: traitComposition [
 	^ traitComposition selectors removeDuplicates
 		collect: [ :sel | traitComposition compiledMethodAt: sel ]
